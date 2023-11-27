@@ -1,105 +1,89 @@
 const json2csv = require('json2csv').parse
 const fs = require('fs')
 
-// import a file
-let data = JSON.parse(fs.readFileSync("./path/to/new/format/file"))
+function import_file(path){
+    let new_file = JSON.parse(fs.readFileSync(path))
+    return new_file
+}
 
-// extract field names from json
-let newFields = Object.keys(data[0])
+function get_fields_json(model_name){
+    let json_file = import_file("originalFields.json")
+    let fields_list = json_file[0][model_name]
+    return fields_list
+}
 
-// list of old fields i.e. the fieldnames in the order that we want
-const oldFields = [
-  'File Name',
-  'Document ID',
-  'Queue ID',
-  'Queue Name',
-  'Model Type',
-  'URL',
-  'IBAN',
-  'Email',
-  'Total',
-  'FX Rate',
-  'Freight',
-  'Currency',
-  'Discount',
-  'PO Number',
-  'Subtotal',
-  'Tax Total',
-  'Other Date',
-  'Signature',
-  'Swift Code',
-  'Vendor Fax Number',
-  'Form Number',
-  'Tax Percent',
-  'Total Check',
-  'Account Name',
-  'Vendor Name',
-  'Invoice Date',
-  'Payment Date',
-  'Payment Term',
-  'Project Name',
-  'RubberStamp',
-  'Unique Stamp',
-  'Vendor Phone Number',
-  'Customer Name',
-  'Invoice Type',
-  'Serial Number',
-  'Account Number',
-  'Invoice Number',
-  'Line Rows Check',
-  'Vendor Address',
-  'Subtotal Check',
-  'Total Rounding',
-  'Billing Address',
-  'Govt. Verification',
-  'ISOCountryCode',
-  'Less Amount Paid',
-  'Description Text',
-  'Discount Percent',
-  'Bank Name',
-  'Shipping Address',
-  'Vendor GST Number',
-  'Vendor Name Check',
-  'Sales Order Number',
-  'Customer GST Number',
-  'Exchange Currency To',
-  'Delivery Order Number',
-  'Exchange Currency From',
-  'Registered Vendor Name',
-  'Registered Vendor Status',
-  'Comments',
-  'Items'
-]
+function get_field_list(file_name){
+    let new_fields_list = Object.keys(file_name[0])
+    return new_fields_list
+}
 
-// traverse through each field and append to field list if field not present in the old format
-var fields = []
+function generate_final_JSON(new_file, field_list){
+    let finalJSON = [];
 
-fields.push(...oldFields);
+    //for each document in the input json
+    for(var a in new_file){
+        finalJSON.push({});
 
-for(let i=0;i<oldFields.length;i++){
-    for(let j=0;j<newFields.length;j++){
-        if(oldFields[i] === newFields[j]){
-            let deleted = newFields.splice(j, 1);
-            break;
+        // for each field in the document
+        for(var i in field_list){
+            if (new_file[a][field_list[i]]){
+                finalJSON[a][field_list[i]] = new_file[a][field_list[i]];
+            } else {
+                finalJSON[a][field_list[i]] = "";
+            }
         }
     }
+    return finalJSON
 }
 
-fields.push(...newFields);
+function generate_csv(json_obj, field_list){
+    const csv = json2csv(json_obj, field_list);
+    return csv
+}
 
-let finalJSON = [];
-for(var a in data){
-    finalJSON.push({});
-    for(var i in fields){
-        finalJSON[a][fields[i]] = data[a][fields[i]];
+function model_temp(model_name , file_name){
+    var new_fields_list = get_field_list(file_name)
+    var old_field_list = get_fields_json(model_name)
+    var fields = []
+
+    fields.push(...old_field_list);
+
+    for(let i=0;i<old_field_list.length;i++){
+        for(let j=0;j<new_fields_list.length;j++){
+            if(old_field_list[i] === new_fields_list[j]){
+                let deleted = new_fields_list.splice(j, 1);
+                break;
+            }
+        }
     }
+    fields.push(...new_fields_list);
+    
+    // Now the 'fields' variable contains the fields in the desired order
+    var final_JSON = generate_final_JSON (file_name , fields)
+
+    var csv = generate_csv(final_JSON,fields)
+
+    return csv
 }
 
-//convert JSON to csv
-const csv = json2csv(finalJSON,fields)
+// Import the new file
+var new_file = import_file("/path/to/newJSON.json")
 
-// generates a csv file
-fs.writeFileSync('./path/to/data.csv',csv,(err) => {
-    if (err) throw err
-    console.log("CSV file is not saved")
-} )
+// Get the Model type from the new file
+let modelType = new_file[0]["Model Type"]
+
+//generate a JSON with all the old fields + new fields
+var new_CSV = model_temp(modelType , new_file)
+
+// writing the JSON string content to a file
+fs.writeFile("/path/to/generated/data.csv", new_CSV, (error) => {
+  // throwing the error
+  // in case of a writing problem
+  if (error) {
+    // logging the error
+    console.error(error);
+
+    throw error;
+  }
+  console.log("data.csv generated");
+});
